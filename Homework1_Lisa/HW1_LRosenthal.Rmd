@@ -7,14 +7,14 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(ggplot2);library(arm)
+library(ggplot2);library(arm);library(bbmle) 
 ```
 
 ###Question 1
 Load the data set “CO2_HW1.txt”, which describes the CO2 uptake rates of plants of the grass species Echinochloa crus-galli from Quebec and Mississippi. 
 
 ```{r load}
-CO2 <- read.table("~/Desktop/Stat Model class F2017/Homework1/CO2_HW1.txt",header=T)
+CO2 <- read.table("~/Desktop/Stat Model class F2017/PLS298_git/Homework1_Lisa/CO2_HW1.txt",header=T)
 ```
 
 Using a linear model for the analysis, investigate these questions:
@@ -96,7 +96,7 @@ totallfno: count of total leaves at end of experiment
 ffdate: date of first flowering in days after germination
 
 ```{r loadquestion2, echo = F}
-ec <- read.table("~/Desktop/Stat Model class F2017/Homework1/ecdata_HW1.txt",header=T)
+ec <- read.table("~/Desktop/Stat Model class F2017/PLS298_git/Homework1_Lisa/ecdata_HW1.txt",header=T)
 dev.off()
 ```
 
@@ -112,18 +112,44 @@ shape.ec <- mean(ec$ffdate)^2 / var(ec$ffdate)
 scale.ec <- var(ec$ffdate) / mean(ec$ffdate)
 
 #plot the gamma distribution
-curve(dgamma(x, shape=shape.start, scale=scale.start), from=10, to=60, col=5, add=T)
+curve(dgamma(x, shape=shape.ec, scale=scale.ec), from=10, to=60, col=5, add=T)
 
 ```
 
 Now I need to compare the fits of the two curves.
 ```{r}
 #write out the model for dnorm
-model.normal <- mle2(ffdate~dnorm(mean=mu, sd=sigma), data=ec, start=list(mu=mean(ec$ffdate), sigma=sd(ec$ffdate)))
+model.normal <- mle2(ffdate~dnorm(mean=mu, sd=sigma), data=ec, start=list(mu=mean(ec$ffdate), sigma=sd(ec$ffdate))) #Log-likelihood: -2100.62 
+
 
 #i have no clue. start up here again. 
-model.gamma <- mle2(ffdate~dgamma(x, shape=shape.start, scale=scale.start), data=ec, start=list(mu=mean(ec$ffdate), sigma=sd(ec$ffdate)))
+model.gamma <- mle2(ffdate~dgamma(shape=shape, scale=scale), data=ec, start=list(shape=shape.ec, scale=scale.ec)) #Log-likelihood: -2110.89 
+
+AIC(model.normal, model.gamma)
 ```
+
+
+Another way to do this is through the function `fitdist`.
+```{r echo=F}
+#lets use fitdist
+library(fitdistrplus)
+```
+
+```{r}
+#normal distribution
+fit.norm <- fitdist(ec$ffdate, "norm", method = "mle")
+summary(fit.norm) #Loglikelihood:  -2100.618   AIC:  4205.235   BIC:  4214.177 
+plot(fit.norm)
+
+#gamma distribution
+fit.gamma <- fitdist(ec$ffdate, "gamma")
+summary(fit.gamma) #Loglikelihood:  -2110.891   AIC:  4225.783   BIC:  4234.724 
+plot(fit.gamma)
+
+#comparison
+denscomp(list(fit.gamma, fit.norm), legendtext=c("gamma", "norm"))
+```
+Ultimately, both the original way of fitting the data and through `fitdist` indicate that the normal distribution is the best fit.
 
 
 Calculate the log-likelihood for the normal distribution at the fitted values of the parameters. Verify graphically (show on some kind of simple plot) that the log-likelihood of the data becomes more negative as the value of the mean moves farther from its maximum-likelihood value.
