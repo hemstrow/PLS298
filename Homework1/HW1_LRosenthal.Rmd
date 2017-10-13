@@ -1,0 +1,130 @@
+---
+title: "HW1"
+author: "lisa rosenthal"
+date: "10/13/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2);library(arm)
+```
+
+###Question 1
+Load the data set “CO2_HW1.txt”, which describes the CO2 uptake rates of plants of the grass species Echinochloa crus-galli from Quebec and Mississippi. 
+
+```{r load}
+CO2 <- read.table("~/Desktop/Stat Model class F2017/Homework1/CO2_HW1.txt",header=T)
+```
+
+Using a linear model for the analysis, investigate these questions:
+
+How does the air concentration of CO2 (“logconc”) affect a grass plant’s CO2 uptake rate (“uptake”)?
+
+```{r}
+#uptake increases with logconc, but clearly there are 2 groups (type)
+ggplot(data = CO2, aes(logconc, uptake))+
+         geom_point() 
+
+```
+
+Does this effect depend on the origin of the plant (“Type”)?
+In your answer, include some information on:
+What transformations if any you made on the data and why.
+What steps you took to check model assumptions and model performance. 
+What the coefficients of the model are and how you interpret them. 
+
+```{r}
+pairs(CO2) #shows that the data is different between types
+ggplot(data = CO2, aes(logconc, uptake, col = Type))+
+         geom_point() 
+
+#Does this effect depend on the origin of the plant (“Type”)?
+#the data clearly depends on type as shown above and when we seperate the data by "type", two distinct distributions appear.
+ggplot(data = CO2, aes(uptake, fill = Type))+
+         geom_histogram() 
+
+#What transformations if any you made on the data and why.
+#logtransforming does not make uptake more normal, so I wouldn't try to logtransform the data.
+ggplot(data = CO2, aes(logconc, log(uptake), col = Type))+
+         geom_point() 
+ggplot(data = CO2, aes(log(uptake), fill = Type))+
+         geom_histogram() 
+
+#Here are three models, one that looks at how uptake changes with logconc, one that includes type as another fixed effect, and another that includes type and the interaction between type and logconc
+m1 <- lm(uptake ~ logconc, data = CO2)
+par(mfrow = c(1,2))
+plot(m1, which=1:2)
+plot(resid(m1)~CO2$logconc)
+#This model shows the spread of residuals are not homogenous and clearly forms two groups. They are also not normal.
+
+m2 <- lm(uptake ~ logconc+Type, data = CO2)
+par(mfrow = c(1,2))
+plot(m2, which=1:2)
+plot(resid(m2)~CO2$logconc)
+#this model helps a little bit, but the residuals still are not very linear. 
+
+m3 <- lm(uptake ~ logconc+Type+logconc*Type, data = CO2)
+par(mfrow = c(1,2))
+plot(m3, which=1:2)
+plot(resid(m3)~CO2$logconc)
+#the interaction term doesn't change things too much, but I'll compare m2 and m3 with AIC to see which fits better.
+
+AIC(m2, m3)#the difference between AIC is 18. m3 is much better, which includes the interaction term.
+
+#now to interpret model3
+display(m3)
+#this model states that when logconc is 0, uptake is -4.40. This clearly doesn't make sense, so I'll need to center the logconc values.
+
+CO2$logconc.center <- CO2$logconc - mean(CO2$logconc)
+hist(CO2$logconc.center)
+
+m3.centered <- lm(uptake ~ logconc.center+Type+logconc.center*Type, data = CO2)
+ggplot(data = CO2, aes(logconc.center, uptake, col = Type))+
+  geom_point() +
+  geom_smooth(method = "lm")
+  
+display(m3.centered)
+#now the values are little more interpretable. At the average logconcentration (=0), uptake rate for mississippi (the reference) is 15.81. In Quebec, the uptake is 15.94 units higher than mississippi (15.94 + 15.81 = the intercept at 0). The slope of missippi is 3.47 and the slope of quebec is 7.70 + 3.47.
+```
+
+###Question 2
+Load the data set “ecdata_HW1.txt”, which includes some growth and flowering time information on some Erodium cicutarium plants from serpentine and non-serpentine environments. The columns are:
+sourceSOILTYPE: soil type of source population, 1 = non-serpentine, 2 = serpentine
+earlylfno: count of leaves early in the plant’s growth
+totallfno: count of total leaves at end of experiment
+ffdate: date of first flowering in days after germination
+
+```{r loadquestion2, echo = F}
+ec <- read.table("~/Desktop/Stat Model class F2017/Homework1/ecdata_HW1.txt",header=T)
+dev.off()
+```
+
+Fit a normal distribution to the Erodium ffdate data. Also fit a gamma distribution – does this distribution fit the data better or worse than the normal distribution does? Which is “better” by AIC score, or they both about the same? 
+
+Lets first start by plotting the data and superimposing the normal distribution, gamma distribution and density curve
+```{r normaldistribution}
+hist(ec$ffdate, freq = F, ylim = c(0,.08)) #this is what the raw data look like
+# Plot the fitted normal distribution
+min(ec$ffdate); max(ec$ffdate)
+curve(dnorm(x, mean=mean(ec$ffdate), sd=sd(ec$ffdate)), from=10, to=60, n=100, add=T, col="slateblue", lwd=2)
+shape.ec <- mean(ec$ffdate)^2 / var(ec$ffdate)
+scale.ec <- var(ec$ffdate) / mean(ec$ffdate)
+
+#plot the gamma distribution
+curve(dgamma(x, shape=shape.start, scale=scale.start), from=10, to=60, col=5, add=T)
+
+```
+
+Now I need to compare the fits of the two curves.
+```{r}
+#write out the model for dnorm
+model.normal <- mle2(ffdate~dnorm(mean=mu, sd=sigma), data=ec, start=list(mu=mean(ec$ffdate), sigma=sd(ec$ffdate)))
+
+#i have no clue. start up here again. 
+model.gamma <- mle2(ffdate~dgamma(x, shape=shape.start, scale=scale.start), data=ec, start=list(mu=mean(ec$ffdate), sigma=sd(ec$ffdate)))
+```
+
+
+Calculate the log-likelihood for the normal distribution at the fitted values of the parameters. Verify graphically (show on some kind of simple plot) that the log-likelihood of the data becomes more negative as the value of the mean moves farther from its maximum-likelihood value.
+
